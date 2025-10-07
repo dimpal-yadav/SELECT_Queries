@@ -6,19 +6,24 @@ on:
   pull_request:
     types: [opened]
 
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   auto-label:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
       - name: Create & assign labels
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Use bash explicitly
           #!/bin/bash
+          set -e
 
           # Determine if it's issue or PR
           if [ "${{ github.event_name }}" == "issues" ]; then
@@ -50,12 +55,16 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/${GITHUB_REPOSITORY}/labels \
               -d "{\"name\":\"$NAME\",\"color\":\"$COLOR\"}")
+
             if [[ "$RESPONSE" == "422" ]]; then
               echo "Label '$NAME' already exists."
             else
               echo "Label '$NAME' created."
             fi
           done
+
+          # Wait a bit to ensure GitHub registers labels
+          sleep 2
 
           # Determine Level label
           LEVEL_LABEL="Level 3 / Advanced"
@@ -68,10 +77,15 @@ jobs:
           echo "Level label: $LEVEL_LABEL"
 
           # Assign labels and assignee
-          curl -s -X POST \
+          ASSIGN_RESPONSE=$(curl -s -w "%{http_code}" -o /dev/null \
+            -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$NUMBER \
-            -d "{\"labels\":[\"GSSoC 25\",\"$LEVEL_LABEL\"],\"assignees\":[\"$CREATOR\"]}"
+            -d "{\"labels\":[\"GSSoC 25\",\"$LEVEL_LABEL\"],\"assignees\":[\"$CREATOR\"]}")
 
-          echo "Assigned labels and creator"
+          if [[ "$ASSIGN_RESPONSE" == "200" ]]; then
+            echo "Labels and assignee successfully assigned."
+          else
+            echo "Failed to assign labels or assignee. Response code: $ASSIGN_RESPONSE"
+          fi
