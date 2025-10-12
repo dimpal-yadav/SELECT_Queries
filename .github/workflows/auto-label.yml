@@ -13,30 +13,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Set up labels
+      - name: Create and Assign Labels
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Labels and colors
-          LABELS=("Level 1 / Beginner:#7AE7FF" "Level 2 / Intermediate:#FFAB70" "Level 3 / Advanced:#FF7F7F" "GSSoC 25:#6F42C1")
+          set -e
 
-          for label_pair in "${LABELS[@]}"; do
-            NAME="${label_pair%%:*}"
-            COLOR="${label_pair##*:}"
+          # ------------------------
+          # 1. Define Labels & Colors
+          # ------------------------
+          declare -A LABELS
+          LABELS["Level 1 / Beginner"]="#7AE7FF"
+          LABELS["Level 2 / Intermediate"]="#FFAB70"
+          LABELS["Level 3 / Advanced"]="#FF7F7F"
+          LABELS["GSSoC 25"]="#6F42C1"
+
+          # ------------------------
+          # 2. Create Labels if Missing
+          # ------------------------
+          for label in "${!LABELS[@]}"; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
               -X POST \
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/${GITHUB_REPOSITORY}/labels \
-              -d "{\"name\":\"$NAME\",\"color\":\"$COLOR\"}")
+              -d "{\"name\":\"$label\",\"color\":\"${LABELS[$label]}\"}")
             if [ "$STATUS" = "422" ]; then
-              echo "Label '$NAME' already exists."
+              echo "Label '$label' already exists."
             else
-              echo "Label '$NAME' created."
+              echo "Label '$label' created."
             fi
           done
 
-          # Detect if it's a PR or Issue
+          # ------------------------
+          # 3. Detect PR vs Issue
+          # ------------------------
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             NUMBER=${{ github.event.pull_request.number }}
             TITLE="${{ github.event.pull_request.title }}"
@@ -49,16 +60,18 @@ jobs:
 
           TEXT="$TITLE $BODY"
 
-          # Advanced scoring based on keywords
+          # ------------------------
+          # 4. Determine Level Label
+          # ------------------------
           SCORE=0
-          # Level 1
+
+          # Level 1 keywords
           echo "$TEXT" | grep -iqE "typo|doc|documentation|readme|ui" && SCORE=$((SCORE+1))
-          # Level 2
+          # Level 2 keywords
           echo "$TEXT" | grep -iqE "feature|bug|small|update|fix" && SCORE=$((SCORE+2))
-          # Level 3
+          # Level 3 keywords
           echo "$TEXT" | grep -iqE "major|refactor|performance|optimization|critical" && SCORE=$((SCORE+3))
 
-          # Determine level label
           if [ $SCORE -le 2 ]; then
             LEVEL_LABEL="Level 1 / Beginner"
           elif [ $SCORE -le 4 ]; then
@@ -67,11 +80,13 @@ jobs:
             LEVEL_LABEL="Level 3 / Advanced"
           fi
 
-          # Assign labels
+          # ------------------------
+          # 5. Assign Labels
+          # ------------------------
           curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$NUMBER/labels \
             -d "{\"labels\":[\"GSSoC 25\",\"$LEVEL_LABEL\"]}"
 
-          echo "Assigned Labels: GSSoC 25, $LEVEL_LABEL"
+          echo "✅ Labels assigned: GSSoC 25, $LEVEL_LABEL"
