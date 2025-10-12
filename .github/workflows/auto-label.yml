@@ -14,76 +14,64 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up labels
-        uses: octokit/request-action@v2
-        id: create-labels
-        with:
-          route: POST /repos/${{ github.repository }}/labels
-          mediaType: '{"previews":["symmetra"]}'
-
-      - name: Create labels if missing and assign
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Define labels and colors
-          declare -A labels
-          labels["Level 1 / Beginner"]="#7AE7FF"
-          labels["Level 2 / Intermediate"]="#FFAB70"
-          labels["Level 3 / Advanced"]="#FF7F7F"
-          labels["GSSoC 25"]="#6F42C1"
+          # Labels and colors
+          LABELS=("Level 1 / Beginner:#7AE7FF" "Level 2 / Intermediate:#FFAB70" "Level 3 / Advanced:#FF7F7F" "GSSoC 25:#6F42C1")
 
-          # Create labels if they don't exist
-          for label in "${!labels[@]}"; do
-            response=$(curl -s -o /dev/null -w "%{http_code}" \
+          for label_pair in "${LABELS[@]}"; do
+            NAME="${label_pair%%:*}"
+            COLOR="${label_pair##*:}"
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
               -X POST \
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/${GITHUB_REPOSITORY}/labels \
-              -d "{\"name\":\"$label\",\"color\":\"${labels[$label]}\"}")
-            if [[ "$response" == "422" ]]; then
-              echo "Label '$label' already exists, skipping."
+              -d "{\"name\":\"$NAME\",\"color\":\"$COLOR\"}")
+            if [ "$STATUS" = "422" ]; then
+              echo "Label '$NAME' already exists."
             else
-              echo "Label '$label' created."
+              echo "Label '$NAME' created."
             fi
           done
 
-          # Get title and body
-          TITLE="${{ github.event.issue.title || github.event.pull_request.title }}"
-          BODY="${{ github.event.issue.body || github.event.pull_request.body }}"
+          # Detect if it's a PR or Issue
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            NUMBER=${{ github.event.pull_request.number }}
+            TITLE="${{ github.event.pull_request.title }}"
+            BODY="${{ github.event.pull_request.body }}"
+          else
+            NUMBER=${{ github.event.issue.number }}
+            TITLE="${{ github.event.issue.title }}"
+            BODY="${{ github.event.issue.body }}"
+          fi
+
           TEXT="$TITLE $BODY"
 
-          # Improved logic for level detection using keyword weights
-          LEVEL_SCORE=0
+          # Advanced scoring based on keywords
+          SCORE=0
+          # Level 1
+          echo "$TEXT" | grep -iqE "typo|doc|documentation|readme|ui" && SCORE=$((SCORE+1))
+          # Level 2
+          echo "$TEXT" | grep -iqE "feature|bug|small|update|fix" && SCORE=$((SCORE+2))
+          # Level 3
+          echo "$TEXT" | grep -iqE "major|refactor|performance|optimization|critical" && SCORE=$((SCORE+3))
 
-          # Level 1 keywords
-          if echo "$TEXT" | grep -iqE "typo|doc|documentation|readme|ui"; then
-            LEVEL_SCORE=$((LEVEL_SCORE + 1))
-          fi
-
-          # Level 2 keywords
-          if echo "$TEXT" | grep -iqE "feature|bug|small|update|fix"; then
-            LEVEL_SCORE=$((LEVEL_SCORE + 2))
-          fi
-
-          # Level 3 keywords
-          if echo "$TEXT" | grep -iqE "major|refactor|performance|optimization|critical"; then
-            LEVEL_SCORE=$((LEVEL_SCORE + 3))
-          fi
-
-          # Determine final label based on score
-          if [ $LEVEL_SCORE -le 2 ]; then
+          # Determine level label
+          if [ $SCORE -le 2 ]; then
             LEVEL_LABEL="Level 1 / Beginner"
-          elif [ $LEVEL_SCORE -le 4 ]; then
+          elif [ $SCORE -le 4 ]; then
             LEVEL_LABEL="Level 2 / Intermediate"
           else
             LEVEL_LABEL="Level 3 / Advanced"
           fi
 
-          # Assign labels to issue or PR
-          ISSUE_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
+          # Assign labels
           curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$ISSUE_NUMBER/labels \
+            https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$NUMBER/labels \
             -d "{\"labels\":[\"GSSoC 25\",\"$LEVEL_LABEL\"]}"
 
-          echo "Labels assigned: GSSoC 25, $LEVEL_LABEL"
+          echo "Assigned Labels: GSSoC 25, $LEVEL_LABEL"
