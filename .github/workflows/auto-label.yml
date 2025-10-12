@@ -17,59 +17,35 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          #!/bin/bash
           set -e
 
-          # ------------------------
-          # 1. Define Labels & Colors
-          # ------------------------
+          # Labels
           declare -A LABELS
           LABELS["Level 1 / Beginner"]="#7AE7FF"
           LABELS["Level 2 / Intermediate"]="#FFAB70"
           LABELS["Level 3 / Advanced"]="#FF7F7F"
           LABELS["GSSoC 25"]="#6F42C1"
 
-          # ------------------------
-          # 2. Create Labels if Missing
-          # ------------------------
+          # Create labels if missing
           for label in "${!LABELS[@]}"; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              -X POST \
+            curl -s -X POST \
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/${GITHUB_REPOSITORY}/labels \
-              -d "{\"name\":\"$label\",\"color\":\"${LABELS[$label]}\"}")
-            if [ "$STATUS" = "422" ]; then
-              echo "Label '$label' already exists."
-            else
-              echo "Label '$label' created."
-            fi
+              -d "{\"name\":\"$label\",\"color\":\"${LABELS[$label]}\"}" || true
           done
 
-          # ------------------------
-          # 3. Detect PR vs Issue
-          # ------------------------
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            NUMBER=${{ github.event.pull_request.number }}
-            TITLE="${{ github.event.pull_request.title }}"
-            BODY="${{ github.event.pull_request.body }}"
-          else
-            NUMBER=${{ github.event.issue.number }}
-            TITLE="${{ github.event.issue.title }}"
-            BODY="${{ github.event.issue.body }}"
-          fi
-
+          # Read title, body, number from event JSON
+          TITLE=$(jq -r '.issue.title // .pull_request.title' "$GITHUB_EVENT_PATH")
+          BODY=$(jq -r '.issue.body // .pull_request.body' "$GITHUB_EVENT_PATH")
+          NUMBER=$(jq -r '.issue.number // .pull_request.number' "$GITHUB_EVENT_PATH")
           TEXT="$TITLE $BODY"
 
-          # ------------------------
-          # 4. Determine Level Label
-          # ------------------------
+          # Determine level
           SCORE=0
-
-          # Level 1 keywords
           echo "$TEXT" | grep -iqE "typo|doc|documentation|readme|ui" && SCORE=$((SCORE+1))
-          # Level 2 keywords
           echo "$TEXT" | grep -iqE "feature|bug|small|update|fix" && SCORE=$((SCORE+2))
-          # Level 3 keywords
           echo "$TEXT" | grep -iqE "major|refactor|performance|optimization|critical" && SCORE=$((SCORE+3))
 
           if [ $SCORE -le 2 ]; then
@@ -80,9 +56,7 @@ jobs:
             LEVEL_LABEL="Level 3 / Advanced"
           fi
 
-          # ------------------------
-          # 5. Assign Labels
-          # ------------------------
+          # Assign labels
           curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
