@@ -1,38 +1,28 @@
 name: Auto Comment on Issue
 
-# Trigger when an issue is opened
 on:
   issues:
     types: [opened]
 
-# Give permissions to write comments
 permissions:
   issues: write
 
 jobs:
-  comment:
+  test-comment:
     runs-on: ubuntu-latest
     steps:
-      - name: Add Comment to Issue
+      - name: Add Comment
         uses: actions/github-script@v6
         with:
           script: |
-            // Get the issue number and the opener's username
             const issueNumber = context.issue.number;
-            const issueOpener = context.payload.issue.user.login;
+            const opener = context.payload.issue.user.login;
 
-            // List of maintainers to cc (replace with real usernames)
-            const maintainers = ["maintainer1", "maintainer2"];
-
-            // Build the comment body
-            const commentBody = `### Thank you for raising this issue, @${issueOpener}! 🎉
+            const commentBody = `### Thank you for raising this issue, @${opener}! 🎉
 We'll review it as soon as possible. We truly appreciate your contributions! ✨
 
-> Meanwhile, please check the README.md, CONTRIBUTING.md, and CODE_OF_CONDUCT.md before creating a PR. Also, do NOT create a PR until this issue has been assigned to you. 😊
+> Meanwhile, make sure you've visited the README.md, CONTRIBUTING.md, and CODE_OF_CONDUCT.md before creating a PR for this. Also, please do NOT create a PR until this issue has been assigned to you. 😊`;
 
-cc ${maintainers.map(u => `@${u}`).join(' ')}`;
-
-            // Create the comment
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -40,4 +30,4 @@ cc ${maintainers.map(u => `@${u}`).join(' ')}`;
               body: commentBody
             });
 
-            console.log('Comment added successfully with issue opener and maintainers mentioned.');
+            console.log('Comment added successfully mentioning the issue opener.');
