@@ -18,6 +18,7 @@ jobs:
             const issueNumber = context.issue.number;
             const opener = context.payload.issue.user.login;
 
+            // Use backticks for multi-line comment
             const commentBody = `### Thank you for raising this issue, @${opener}! 🎉
 We'll review it as soon as possible. We truly appreciate your contributions! ✨
 
