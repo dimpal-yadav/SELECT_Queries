@@ -1,4 +1,4 @@
-name: Auto Comment on Issue
+name: Test Comment on Issue
 
 on:
   issues:
@@ -8,25 +8,22 @@ permissions:
   issues: write
 
 jobs:
-  comment:
+  test-comment:
     runs-on: ubuntu-latest
     steps:
-      - name: Add Comment to Issue
+      - name: Add Comment
         uses: actions/github-script@v6
         with:
           script: |
+            console.log("Full payload:", JSON.stringify(context.payload));
             const issueNumber = context.issue.number;
-            const issueCreator = context.payload.issue.user.login; // Safe way to get issue opener
-            const commentBody = `### Thank you for raising this issue, @${issueCreator}! 🎉
-We'll review it as soon as possible. We truly appreciate your contributions! ✨
-
-> Meanwhile, make sure you've visited the README.md, CONTRIBUTING.md, and CODE_OF_CONDUCT.md before creating a PR for this. Also, please do NOT create a PR until this issue has been assigned to you. 😊`;
+            console.log("Issue number:", issueNumber);
+            const opener = context.payload.issue.user.login;
+            console.log("Issue opened by:", opener);
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issueNumber,
-              body: commentBody
+              body: `Hello @${opener}, this is a test comment!`
             });
-
-            console.log('Comment added successfully mentioning the issue opener.');
