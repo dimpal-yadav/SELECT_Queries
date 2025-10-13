@@ -16,7 +16,7 @@ jobs:
         with:
           script: |
             const issueNumber = context.issue.number;
-            const issueCreator = context.actor; // The person who opened the issue
+            const issueCreator = context.payload.issue.user.login; // Safe way to get issue opener
             const commentBody = `### Thank you for raising this issue, @${issueCreator}! 🎉
 We'll review it as soon as possible. We truly appreciate your contributions! ✨
 
