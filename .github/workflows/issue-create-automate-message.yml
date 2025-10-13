@@ -8,10 +8,10 @@ permissions:
   issues: write
 
 jobs:
-  test-comment:
+  comment:
     runs-on: ubuntu-latest
     steps:
-      - name: Add Comment
+      - name: Add Comment to Issue
         uses: actions/github-script@v6
         with:
           script: |
