@@ -16,12 +16,11 @@ jobs:
         with:
           script: |
             const issueNumber = context.issue.number;
-            const commentBody = `### Thank you for raising this issue!
+            const issueCreator = context.actor; // The person who opened the issue
+            const commentBody = `### Thank you for raising this issue, @${issueCreator}! 🎉
 We'll review it as soon as possible. We truly appreciate your contributions! ✨
 
-> Meanwhile, make sure you've visited the README.md, CONTRIBUTING.md, and CODE_OF_CONDUCT.md before creating a PR for this. Also, please do NOT create a PR until this issue has been assigned to you. 😊
-
-cc @realGitHubUser1 @realGitHubUser2`; // Replace with actual usernames
+> Meanwhile, make sure you've visited the README.md, CONTRIBUTING.md, and CODE_OF_CONDUCT.md before creating a PR for this. Also, please do NOT create a PR until this issue has been assigned to you. 😊`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -30,4 +29,4 @@ cc @realGitHubUser1 @realGitHubUser2`; // Replace with actual usernames
               body: commentBody
             });
 
-            console.log('Comment added successfully with cc mentions.');
+            console.log('Comment added successfully mentioning the issue opener.');
